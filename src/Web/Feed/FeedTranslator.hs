@@ -9,9 +9,15 @@ import Text.Feed.Types (Feed, Item)
 import Text.Feed.Query (feedItems, getFeedTitle, getItemId, getItemDescription,
                         getItemLink, getItemSummary, getItemTitle)
 
--- Translator engine type.
-data Translator = Translator { textTranslator :: Text -> IO Text
-                             , urlTranslator :: URI -> Maybe URI
+-- Text translator engine type.
+type TextTranslator = Text -> IO Text
+
+-- Link translator engine type.
+type UrlTranslator = URI -> Maybe URI
+
+-- Translator engine type combining 'TextTranslator' and 'UrlTranslator'.
+data Translator = Translator { textTranslator :: TextTranslator
+                             , urlTranslator :: UrlTranslator
                              }
 
 -- | Translate the given feed.
