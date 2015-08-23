@@ -15,6 +15,9 @@ cabal-version:       >=1.10
 executable feed-translator
   main-is:             Main.hs
   build-depends:       base             >=4.7      && <4.8,
+                       blaze-html       >=0.8.0.0  && <0.9.0.0,
+                       blaze-markup     >=0.7      && <0.8,
+                       containers,
                        feed             >=0.3.10.0 && <0.4.0.0,
                        iso639,
                        lens             >=4.5,

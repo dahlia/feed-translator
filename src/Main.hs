@@ -8,6 +8,6 @@ port = 8080
 main :: IO ()
 main = do
     app <- application
-    putStrLn ("Running on http://0.0.0.0:" ++ (show port) ++
+    putStrLn ("Running on http://0.0.0.0:" ++ show port ++
               "/ (Press CTRL+C to quit)")
     run port app
