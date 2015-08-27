@@ -1,0 +1,12 @@
+{
+    "name": "feed-translator",
+    "description": "Translate syndication feeds",
+    "keywords": ["feed", "syndication", "translator"],
+    "website": "https://github.com/dahlia/feed-translator",
+    "repository": "https://github.com/dahlia/feed-translator",
+    "buildpacks": [
+        {
+            "url": "https://github.com/begriffs/heroku-buildpack-ghc.git"
+        }
+    ]
+}
