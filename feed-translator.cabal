@@ -1,5 +1,5 @@
 name:                feed-translator
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Translate syndication feeds
 homepage:            https://github.com/dahlia/feed-translator
 bug-reports:         https://github.com/dahlia/feed-translator/issues
