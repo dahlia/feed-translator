@@ -1,22 +1,54 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, QuasiQuotes #-}
 module Web.Feed.FeedTranslatorView (index) where
 
-import Text.Blaze.Html (Html)
+import Control.Monad (forM_)
+import Data.List (intercalate)
+
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import Text.Blaze (dataAttribute)
+import Text.Blaze.Html (Html, toHtml)
 import Text.Blaze.Html5
-import Text.Blaze.Internal (AttributeValue)
+import Text.Blaze.Internal (AttributeValue, stringValue)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
+import Text.RawString.QQ
+
+languagePairs :: M.Map String (S.Set String)
+languagePairs = M.fromList [ ("en", S.fromList ["ko", "es", "pt", "id", "th"])
+                           , ("ko", S.fromList ["en", "ja"])
+                           , ("ja", S.fromList ["ko"])
+                           , ("es", S.fromList ["en"])
+                           , ("pt", S.fromList ["en"])
+                           , ("id", S.fromList ["en"])
+                           , ("th", S.fromList ["en"])
+                           ]
+
+languageNames :: M.Map String String
+languageNames = M.fromList [ ("en", "English")
+                           , ("ko", "한국어")
+                           , ("ja", "日本語")
+                           , ("es", "español")
+                           , ("pt", "português")
+                           , ("id", "Bahasa Indonesia")
+                           , ("th", "ไทย")
+                           ]
 
 languageSelector :: AttributeValue -- | The 'name' of 'select' element.
                  -> Html
 languageSelector name' =
-    select ! A.name name' ! A.id name' $ do
-        option ! A.disabled "disabled"
-               ! A.selected "selected"
-               ! A.value ""
-               $ "Choose language"
-        option ! A.value "ko" $ "한국어 (ko)"
-        option ! A.value "ja" $ "日本語 (ja)"
+    select ! A.name name' ! A.id name' ! A.class_ "browser-default" $ do
+        let langs = M.toList languageNames
+        forM_ langs $ \(code, name') ->
+            let targets = case M.lookup code languagePairs of
+                              Just set -> intercalate "," $ S.toList set
+                              Nothing -> ""
+                opt = option ! A.value (stringValue code)
+                             ! dataAttribute "targets" (stringValue targets)
+            in case targets of
+                   "" -> opt ! A.disabled "disabled"
+                   _ -> opt
+               $ toHtml (name' ++ " [" ++ code ++ "]")
 
 materializeCss :: AttributeValue
 materializeCss = "//cdnjs.cloudflare.com/ajax/libs/materialize/0.97.0/css/materialize.min.css"
@@ -49,12 +81,20 @@ index =
                     "."
                 form ! A.action "/query/" $ do
                     H.div ! A.class_ "row" $ do
-                        H.div ! A.class_ "input-field col s6" $ do
-                            languageSelector "source"
-                            label ! A.for "source" $ "From"
-                        H.div ! A.class_ "input-field col s6" $ do
-                            languageSelector "target"
-                            label ! A.for "target" $ "To"
+                        H.div ! A.class_ "col s6" $ do
+                            H.div ! A.class_ "row" $
+                                H.div ! A.class_ "input-field col s12" $
+                                    label ! A.for "source" $ "From"
+                            H.div ! A.class_ "row" $
+                                H.div ! A.class_ "input-field col s12" $
+                                    languageSelector "source"
+                        H.div ! A.class_ "col s6" $ do
+                            H.div ! A.class_ "row" $
+                                H.div ! A.class_ "input-field col s12" $
+                                    label ! A.for "target" $ "To"
+                            H.div ! A.class_ "row" $
+                                H.div ! A.class_ "input-field col s12" $
+                                    languageSelector "target"
                     H.div ! A.class_ "row" $
                         H.div ! A.class_ "input-field col s12" $ do
                             input ! A.id "url"
@@ -69,4 +109,22 @@ index =
                                    $ "Translate"
             script ! A.src jQueryJs $ ""
             script ! A.src materializeJs $ ""
-            script "jQuery('select').material_select();"
+            script [r|
+                (function ($) {
+                    var filterTarget = function () {
+                        var sourceOption = $('option:selected', this);
+                        var dataTargets = sourceOption.data('targets') || '';
+                        var targets = dataTargets.split(',');
+                        $('select[name=target] > option').prop(
+                            'disabled',
+                            function () {
+                                return targets.indexOf(this.value) < 0;
+                            }
+                        );
+                        $('select[name=target] > ' +
+                          'option:not(:disabled):first').prop('selected', true);
+                    };
+                    var source = $('select[name=source]').change(filterTarget)
+                                                         .each(filterTarget);
+                })(jQuery);
+            |]
