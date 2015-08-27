@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Web.Feed.FeedTranslatorWai (application) where
 
-import Control.Lens.Getter ((^.))
+import Data.Maybe (catMaybes, listToMaybe)
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (liftIO)
+
+import Control.Lens.Getter ((^.))
 import Data.LanguageCodes (ISO639_1, fromChars)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -16,7 +18,8 @@ import qualified Network.Wreq as W
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Feed.Types (Feed)
 import Text.Feed.Export (xmlFeed)
-import Text.Feed.Import (parseFeedSource)
+import Text.Feed.Import (readAtom, readRSS1, readRSS2)
+import Text.XML.Light.Input (parseXMLDoc)
 import Text.XML.Light.Output (showElement)
 import Web.Scotty (ActionM, get, html, next, param, params, raw, redirect,
                    regex, request, scottyApp, setHeader)
@@ -42,8 +45,11 @@ translateFeedUrl translator url = do
     response <- W.get url
     case response ^. W.responseStatus . W.statusCode of
         200 -> do
-            let xmlString = response ^. W.responseBody
-                feed = parseFeedSource $ LTE.decodeUtf8 xmlString
+            let xmlString = LTE.decodeUtf8 $ response ^. W.responseBody
+                xmlDoc = parseXMLDoc xmlString
+                readers = [readAtom, readRSS2, readRSS1]
+                possibleFeeds = catMaybes [read =<< xmlDoc | read <- readers]
+                feed = listToMaybe possibleFeeds
             case feed of
                 Just feed' -> translateFeed translator feed'
                 Nothing ->
