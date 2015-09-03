@@ -2,12 +2,14 @@
 module Web.Feed.FeedTranslatorWai (application) where
 
 import Data.Maybe (catMaybes, listToMaybe)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (liftIO)
 
 import Control.Lens.Getter ((^.))
+import Data.ByteString (ByteString)
 import Data.LanguageCodes (ISO639_1, fromChars)
-import qualified Data.Map as M
+import Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
 import Data.Text.Encoding (decodeUtf8)
@@ -25,6 +27,7 @@ import Web.Scotty (ActionM, get, html, next, param, params, raw, redirect,
                    regex, request, scottyApp, setHeader)
 
 import Web.Feed.FeedTranslator (Translator(..), translateFeed)
+import Web.Feed.FeedTranslatorCache (CacheMap, wrapTranslate)
 import Web.Feed.FeedTranslatorView (index)
 
 -- | Return the Naver Translate engine that translates text from the
@@ -65,9 +68,11 @@ parseLanguageCode code = do
             Nothing -> next
         _ -> next
 
+type CacheKey = (ISO639_1, ISO639_1)
+
 -- | WAI web application.
-application :: IO Application
-application = scottyApp $ do
+application :: IORef (M.Map CacheKey (IORef CacheMap)) -> IO Application
+application cacheMapRef = scottyApp $ do
     get "/" $
         html $ renderHtml index
     get "/query/" $ do
@@ -87,10 +92,25 @@ application = scottyApp $ do
         scheme <- liftM LT.toStrict $ param "3"
         path <- liftM LT.toStrict $ param "4"
         query <- liftM (decodeUtf8 . rawQueryString) request
+        let cacheKey :: CacheKey
+            cacheKey = (source, target)
+        cacheMap <- liftIO $ readIORef cacheMapRef
+        cacheRef <- liftIO $ case M.lookup cacheKey cacheMap of
+            Just ref -> return ref
+            Nothing -> do
+                ref <- newIORef M.empty
+                atomicModifyIORef' cacheMapRef $ \cacheMap ->
+                    (M.insert cacheKey ref cacheMap, ref)
         let url :: String
             url = T.unpack $ T.concat [scheme, "://", path, query]
-        let translator = naverTranslator source target
-        feed <- liftIO $ translateFeedUrl translator url
+            translator :: Translator
+            translator = naverTranslator source target
+            cachedTranslator :: Translator
+            cachedTranslator = translator {
+                textTranslator = wrapTranslate cacheRef
+                                               (textTranslator translator)
+            }
+        feed <- liftIO $ translateFeedUrl cachedTranslator url
         let feedXml = LT.pack $ showElement $ xmlFeed feed
         setHeader "Content-Type" "text/xml; charset=utf8"
         raw $ LTE.encodeUtf8 feedXml

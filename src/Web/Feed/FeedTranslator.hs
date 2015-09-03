@@ -1,4 +1,8 @@
-module Web.Feed.FeedTranslator (Translator(..), translateFeed) where
+module Web.Feed.FeedTranslator ( TextTranslator
+                               , Translator(..)
+                               , UrlTranslator
+                               , translateFeed
+                               ) where
 
 import Control.Monad (liftM)
 import Data.Text (Text, pack, unpack)

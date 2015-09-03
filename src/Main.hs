@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+import Data.IORef (newIORef)
 import Data.String (fromString)
 
+import qualified Data.Map.Strict as M
 import Network.Wai.Handler.Warp ( HostPreference, Port
                                 , defaultSettings, runSettings
                                 , setHost, setPort, setTimeout
@@ -26,7 +28,8 @@ main = do
                        , timeout = 30 &= typ "SECONDS"
                                       &= help "timeout in seconds [30]"
                        } &= summary "Translate syndication feeds"
-    app <- application
+    cacheMapRef <- newIORef M.empty
+    app <- application cacheMapRef
     let settings = setHost (fromString $ host args) $
                    setPort (port args) $
                    setTimeout (timeout args) defaultSettings
